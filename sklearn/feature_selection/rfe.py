@@ -120,7 +120,7 @@ class RFE(BaseEstimator, MetaEstimatorMixin, SelectorMixin):
     def _estimator_type(self):
         return self.estimator._estimator_type
 
-    def fit(self, X, y):
+    def fit(self, X, y, **kwargs):
         """Fit the RFE model and then the underlying estimator on the selected
            features.
 
@@ -131,11 +131,15 @@ class RFE(BaseEstimator, MetaEstimatorMixin, SelectorMixin):
 
         y : array-like, shape = [n_samples]
             The target values.
-        """
-        return self._fit(X, y)
 
-    def _fit(self, X, y, step_score=None):
+        **kwargs : additional arguments
+            Additional parameters to be passed to the classifiers fit function.
+        """
+        return self._fit(X, y, **kwargs)
+
+    def _fit(self, X, y, step_score=None, **kwargs):
         X, y = check_X_y(X, y, "csc")
+
         # Initialization
         n_features = X.shape[1]
         if self.n_features_to_select is None:
@@ -166,7 +170,7 @@ class RFE(BaseEstimator, MetaEstimatorMixin, SelectorMixin):
             if self.verbose > 0:
                 print("Fitting estimator with %d features." % np.sum(support_))
 
-            estimator.fit(X[:, features], y)
+            estimator.fit(X[:, features], y, **kwargs)
 
             # Get coefs
             if hasattr(estimator, 'coef_'):
@@ -201,7 +205,7 @@ class RFE(BaseEstimator, MetaEstimatorMixin, SelectorMixin):
         # Set final attributes
         features = np.arange(n_features)[support_]
         self.estimator_ = clone(self.estimator)
-        self.estimator_.fit(X[:, features], y)
+        self.estimator_.fit(X[:, features], y, **kwargs)
 
         # Compute step score when only n_features_to_select features left
         if step_score:
@@ -230,7 +234,7 @@ class RFE(BaseEstimator, MetaEstimatorMixin, SelectorMixin):
         return self.estimator_.predict(self.transform(X))
 
     @if_delegate_has_method(delegate='estimator')
-    def score(self, X, y):
+    def score(self, X, y, **kwargs):
         """Reduce X to the selected features and then return the score of the
            underlying estimator.
 
@@ -241,8 +245,12 @@ class RFE(BaseEstimator, MetaEstimatorMixin, SelectorMixin):
 
         y : array of shape [n_samples]
             The target values.
+
+        **kwargs : additional arguments
+            Additional parameters to be passed to the classifier's score
+            function.
         """
-        return self.estimator_.score(self.transform(X), y)
+        return self.estimator_.score(self.transform(X), y, **kwargs)
 
     def _get_support_mask(self):
         return self.support_
@@ -374,7 +382,7 @@ class RFECV(RFE, MetaEstimatorMixin):
         self.verbose = verbose
         self.n_jobs = n_jobs
 
-    def fit(self, X, y):
+    def fit(self, X, y, **kwargs):
         """Fit the RFE model and automatically tune the number of selected
            features.
 
@@ -387,6 +395,9 @@ class RFECV(RFE, MetaEstimatorMixin):
         y : array-like, shape = [n_samples]
             Target values (integers for classification, real numbers for
             regression).
+
+        **kwargs : additional arguments
+            Additional parameters to be passed to the classifiers fit function.
         """
         X, y = check_X_y(X, y, "csr")
 
@@ -433,14 +444,14 @@ class RFECV(RFE, MetaEstimatorMixin):
         rfe = RFE(estimator=self.estimator,
                   n_features_to_select=n_features_to_select, step=self.step)
 
-        rfe.fit(X, y)
+        rfe.fit(X, y, **kwargs)
 
         # Set final attributes
         self.support_ = rfe.support_
         self.n_features_ = rfe.n_features_
         self.ranking_ = rfe.ranking_
         self.estimator_ = clone(self.estimator)
-        self.estimator_.fit(self.transform(X), y)
+        self.estimator_.fit(self.transform(X), y, **kwargs)
 
         # Fixing a normalization error, n is equal to get_n_splits(X, y) - 1
         # here, the scores are normalized by get_n_splits(X, y)
